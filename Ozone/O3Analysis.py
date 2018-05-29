@@ -12,6 +12,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy as sp
+import scipy.stats
 
 def ADC2R(ADC,Rpot=0):  #function to convert from ADC to Resistance
     return 2047*(820+Rpot)/ADC-(820+Rpot)
@@ -39,7 +40,7 @@ for fname in f:  #loop throug all the files
         data[fname] = pd.read_csv(path+fname)   #load the cs
         if ('CO' in data[fname].columns.values): # it's an AirU Sensor
             itsAirU[fid]=True
-            data[fname]['O3']=ADC2R(data[fname]['NOX'])/1000 #convert to R in kohm
+            data[fname]['O3']=ADC2R(data[fname]['NOX'])/1000 #converted to R in kohm
             data[fname]=data[fname][(data[fname]['O3']<1e2) & (data[fname]['O3']>.001)] #get rid of rediculous values
             data[fname]['t']=data[fname]['Timestamp'].apply(hhmmss2min)  #split the timestamp into hh mm and ss
             data[fname]['t']=data[fname]['t']-data[fname]['t'].min() #start at t=0
@@ -148,12 +149,15 @@ CL = .95 #confidence level
 fig3, ax3 = plt.subplots(2,2)  #open a new figure in which we will plot
 ax_list=[item for sublist in ax3 for item in sublist] 
 for i in range(0,n):
-    ax3[0][0].plot(cdata['t'],cdata['O3-'+str(i)]/cdata['O3-'+str(i)].max(), label=k) 
+    ln, = ax3[0][0].plot(cdata['t'],cdata['O3-'+str(i)]/cdata['O3-'+str(i)].max(), label=k, alpha=.7) 
     if (i!=0):
         ind=cdata['O3-0']>0
         x=cdata['O3-'+str(i)][ind]
         y=cdata['O3-0'][ind]
         ax_list[i].plot(x, y, 'k.', alpha=.2) 
+        ax_list[i].set_xlabel('Sensor R (KΩ)')
+        ax_list[i].set_ylabel('O3 (ppm)')
+        ax_list[i].grid('on')
         c_fit,R2,ci = fit_w_ci(x,y,linfitfun,CL)
         yfit=linfitfun(x,c_fit[0],c_fit[1],0)
         ax_list[i].plot(x, yfit, 'y--', alpha=.7) 
@@ -169,5 +173,8 @@ for i in range(0,n):
         for v in c_fit:
             print('C{0:d}: {1:10f} ± {2:10f} '.format(k+1, v, ci[k]) )
             k+=1
-        yfit=nonlinfitfun(x,c_fit[0],c_fit[1],c_fit[2])
-        ax_list[i].plot(x, yfit, 'r:', alpha=.8) 
+        xfit=sorted(x)  #order from low to high
+        yfit=nonlinfitfun(xfit,c_fit[0],c_fit[1],c_fit[2])
+        ax_list[i].plot(xfit, yfit, 'r', alpha=.7) 
+    else:
+        ln.set_c([0,0,0])
