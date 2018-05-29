@@ -22,9 +22,13 @@ def hhmmss2min(hhmmss): #covert 'hh:mm:ss' string to minutes
     return int(s[0])*60+int(s[1])+int(s[2])/60  #convert to min
 
 #path string to Data
-path = "D:\\GoogleDrive\\AirU Folder\\scripts\\Examples\\Ozone Example\\"
+path = "D:\\Google Drive\\AirU Folder\\scripts\\Examples\\Ozone Example\\"
 
-f = os.listdir(path)  #read the directory
+f_all = os.listdir(path)  #read the directory
+f=[]
+for fname in f_all:  #loop throug all the files
+    if ( (fname.split('.')[1].lower()=='csv') and not ("fits" in fname) ):
+        f.append(fname)
 data={}     #create an empty dictionary
 n = len(f)  #the number of files
 itsAirU=[True]*n  #initialize the if AirU var
@@ -148,9 +152,10 @@ def nonlinfitfun(x,c1,c2,c3):   #function to fit to, x must be first
 CL = .95 #confidence level
 fig3, ax3 = plt.subplots(2,2)  #open a new figure in which we will plot
 ax_list=[item for sublist in ax3 for item in sublist] 
+fit_df = pd.DataFrame(columns = ["datafile", "c1", "c1 ci", "c2", "c2 ci", "c3", "c3 ci", "R2"])
 for i in range(0,n):
     ln, = ax3[0][0].plot(cdata['t'],cdata['O3-'+str(i)]/cdata['O3-'+str(i)].max(), label=k, alpha=.7) 
-    if (i!=0):
+    if (i!=0):  #it's not the gold standard device
         ind=cdata['O3-0']>0
         x=cdata['O3-'+str(i)][ind]
         y=cdata['O3-0'][ind]
@@ -161,8 +166,6 @@ for i in range(0,n):
         c_fit,R2,ci = fit_w_ci(x,y,linfitfun,CL)
         yfit=linfitfun(x,c_fit[0],c_fit[1],0)
         ax_list[i].plot(x, yfit, 'y--', alpha=.7) 
-        #c_fit,R2,ci = fit_w_ci(x,y,nonlinfitfun,CL,p0=[-1.4,50,.4])
-        
 
         c_fit=[100,0.5,-0.5]
         R2=0
@@ -176,5 +179,10 @@ for i in range(0,n):
         xfit=sorted(x)  #order from low to high
         yfit=nonlinfitfun(xfit,c_fit[0],c_fit[1],c_fit[2])
         ax_list[i].plot(xfit, yfit, 'r', alpha=.7) 
+        fit_df.loc[i-1,"datafile"] = f[i]
+        fit_df.loc[i-1,["c1","c2","c3"]] = c_fit
+        fit_df.loc[i-1,["c1 ci","c2 ci","c3 ci"]] = ci
+        fit_df.loc[i-1,'R2'] = R2
     else:
         ln.set_c([0,0,0])
+fit_df.to_csv(path+'fits.csv')
