@@ -15,10 +15,6 @@ import scipy as sp
 import scipy.stats, datetime, time
 from matplotlib import cm
 
-#path string to Data
-path = "D:\\Google Drive\\AirU Folder\\scripts\\Examples\\Ozone Example\\run_5_23\\"
-#path = "D:\\Google Drive\\AirU Folder\\scripts\\Examples\\Ozone Example\\"
-
 def ADC2R(ADC,Rpot=0):  #function to convert from ADC to Resistance
     return 2047*(820+Rpot)/ADC-(820+Rpot)
 
@@ -28,8 +24,8 @@ def hhmmss2min(hhmmss): #covert 'hh:mm:ss' string to minutes
 
 def whatOutliers(x,y,ymin=0,ymax=1e4):  #code to remove outliers in data
 #x is independent data, y is dependent, ymin is the minumin y could possibly be, ymax is the max
-    nstd = 2
-    w = 2 #window to look for big changes in dy
+    nstd = 1.1
+    w = 3 #window to look for big changes in dy
     avg = np.mean(y)
     std = np.std(y)
     ymax=min(ymax,avg+3*std)
@@ -68,10 +64,12 @@ def whatOutliers(x,y,ymin=0,ymax=1e4):  #code to remove outliers in data
         ytoss=ytoss+list(y[tossit])
         y=np.interp(x,xnew,ynew)  #replace the voids with interpolated data
     except:
-        print('***   Outlier Removal Error - Good Luck   ***')
+        print('***   Outlier Removal Error   ***')
     return y,xtoss,ytoss
 
-
+#path string to Data
+path = "D:\\Google Drive\\AirU Folder\\scripts\\Examples\\Ozone Example\\run_5_23\\"
+#path = "D:\\Google Drive\\AirU Folder\\scripts\\Examples\\Ozone Example\\"
 
 f_all = os.listdir(path)  #read the directory
 f=[]
@@ -92,8 +90,7 @@ min_dt = float("inf")  #the smallest mode of the time step
 max_t = -float("inf")  #the longest total timeof data collection
 ExpData = {}  #place to keep all the miscillaneous info we want
 AirU_fids = [] #airU dataset file ids (where they are in the loop through the files)
-AirU_clr = [] #line colors for air u data
-fig1, ax1 = plt.subplots(2,4)  #open a new figure in which we will plot
+fig1, ax1 = plt.subplots(2,5)  #open a new figure in which we will plot
 
 OutlierList = {'Temp':[-20,50,'T (°C)'], 'Humidity':[0,100,'H (%)'], 'CO':[0,1e3,'CO'], 'O3':[0,1e4,'(NOX-R kOhm)']}
 
@@ -101,25 +98,31 @@ for fname in f:  #loop throug all the files
     data[fid] = pd.read_csv( path + fname )   #load the cs
     if ('CO' in data[fid].columns.values): # it's an AirU Sensor
         AirU_fids.append(fid)
-        AirU_clr.append(cm.jet(len(AirU_fids)/(n-1)))
         ThisData['filename']=fname
         ThisData['fileID']=fid
         ThisData['SensorID']=data[fid]['ID'][0]
-        ThisData['HeatOn']=data[fid]['HEATER ON'].mean()  #is the heater on?
-        ThisData['N']=data[fid]['HEATER ON'].count()      #how many datum were collected?
+        ThisData['HeatOn']=data[0]['HEATER ON'].mean()  #is the heater on?
+        ThisData['N']=data[0]['HEATER ON'].count()      #how many datum were collected?
         data[fid]['O3']=ADC2R(data[fid]['NOX'])/1000 #converted to R in kohm
         data[fid]['t']=data[fid]['Timestamp'].apply(hhmmss2min)  #split the timestamp into hh mm and ss
         data[fid]['t']=data[fid]['t']-data[fid]['t'].min() #start at t=0
-        ThisData['RunTime']=data[fid]['t'].max()      #how long was data collected?
+        ThisData['RunTime']=data[0]['t'].max()      #how long was data collected?
+        #plot raw data
+        #data[fid]=data[fid][(data[fid]['O3']<1e2) & (data[fid]['O3']>.001)] #get rid of rediculous values
+        ax1[0][0].plot(data[fid]['t'],data[fid]['Temp'],label=fname)
+        ax1[0][0].set_xlabel('Time (min)'), ax1[0][0].set_ylabel('T (°C)')
+        ax1[0][1].plot(data[fid]['t'],data[fid]['Humidity'],label=fname)
+        ax1[0][1].set_xlabel('Time (min)'), ax1[0][1].set_ylabel('H (%)')
+        ax1[0][2].plot(data[fid]['t'],data[fid]['CO'],label=fname)
+        ax1[0][2].set_xlabel('Time (min)'), ax1[0][2].set_ylabel('CO')
+        ax1[0][3].plot(data[fid]['t'],data[fid]['O3'],label=fname)
+        ax1[0][3].set_xlabel('Time (min)'), ax1[0][3].set_ylabel('NOX-R (kOhm)')
+        #remove outliers
         cntr=0
         for k, v in OutlierList.items():
-            #plot raw dats
-            ax1[0][cntr].plot(data[fid]['t'],data[fid][k],label=fname,c=AirU_clr[-1])
-            ax1[0][cntr].set_xlabel('Time (min)'), ax1[0][cntr].set_ylabel(v[2])
-            #remove outliers
             outlie = whatOutliers(data[fid]['t'],data[fid][k],v[0],v[1])
             data[fid][k] = outlie[0]
-            ax1[1][cntr].plot(data[fid][k],label=fname,c=AirU_clr[-1])
+            ax1[1][cntr].plot(data[fid][k],label=fname)
             ax1[1][cntr].set_xlabel('Time (min)'), ax1[1][cntr].set_ylabel(v[2])
             ax1[0][cntr].plot(outlie[1],outlie[2],'rx')
             cntr+=1
@@ -136,16 +139,16 @@ for fname in f:  #loop throug all the files
             ExpData['StartTimestamp'] = time.mktime(datetime.datetime.strptime(ExpData['Start'], "%d/%m/%y %H:%M:%S").timetuple())  #timestamp of experiment start
         except:
             ExpData['StartTimestamp'] = time.mktime(datetime.datetime.strptime(ExpData['Start'], "%d/%m/%Y %H:%M:%S").timetuple())
-        ExpData['B2-N'] = data[fid]['t'].count()           #Cell temperature
-        ExpData['B2-RunTime'] = data[fid]['t'].max()           #Cell temperature
-        ExpData['B2-MeanT'] = data[fid]['Temp'].mean()           #Cell temperature
-        ExpData['B2-StdT'] = data[fid]['Temp'].std()           #Cell temperature
-        ExpData['B2-MeanCP'] = data[fid]['Cell Pressure'].mean() #cell pressure
-        ExpData['B2-StdCP'] = data[fid]['Cell Pressure'].std() #cell pressure
-        ExpData['B2-MeanQ'] = data[fid]['Flow Rate'].mean()           #Flowrate
-        ExpData['B2-StdQ'] = data[fid]['Flow Rate'].std()           #Flowrate
-        ExpData['B2-MeanPDV'] = data[fid]['PDV'].mean()           #Voltage for lamp
-        ExpData['B2-StdPDV'] = data[fid]['PDV'].std()           #Voltage for lamp
+        ExpData['MeanCP'] = data[fid]['Cell Pressure'].mean() #cell pressure
+        ExpData['StdCP'] = data[fid]['Cell Pressure'].std() #cell pressure
+        ExpData['MeanQ'] = data[fid]['Flow Rate'].mean()           #Flowrate
+        ExpData['StdQ'] = data[fid]['Flow Rate'].std()           #Flowrate
+        ExpData['MeanPDV'] = data[fid]['PDV'].mean()           #Voltage for lamp
+        ExpData['StdPDV'] = data[fid]['PDV'].std()           #Voltage for lamp
+        ax1[0][0].plot(data[fid]['t'],data[fid]['Temp'],label=fname)
+        ax1[0][0].set_xlabel('Time (min)'), ax1[0][1].set_ylabel('T (°C)')
+        ax1[0][4].plot(data[fid]['t'],data[fid]['O3'], 'k', label=fname)
+        ax1[0][4].set_xlabel('Time (min)'), ax1[0][4].set_ylabel('B2 O3 (ppb)')
     
     data[fid].loc[data[fid]['Temp']<-10,'Temp']=data[fid]['Temp'].median() #fix temperatures
     mode_dt=sp.stats.mode(np.diff(data[fid]['t']))[0][0] #most frequent dt
@@ -157,7 +160,8 @@ for fname in f:  #loop throug all the files
         max_t=maxt
     print('{0:35s} - Size = {1:4d}x{2:1d},  Max t = {3:.0f} (min)'.format(fname,data[fid].shape[0],data[fid].shape[1],maxt))   #print the filename
     fid+=1 #incriment the file id
-fig1.savefig(path+'z_RawData&Outliers.png')
+ax1[0][4].legend()
+
 
 
 ###############   Condition data to make it all in one dataframe    ##############
@@ -191,10 +195,10 @@ for k in AirU_fids: #loop thropugh the data
     iCO = ((data[k]['CO']<1000) & (data[k]['CO']>0)) #reasonable humidities
     cdata[COcol[-1]]=np.interp(cdata['t'],data[k]['t'][iCO],data[k]['CO'][iCO]) #Humidity interpolated to make all data have same dt
     x2=np.array(cdata[O3col[-1]])/np.max(np.array(cdata[O3col[-1]]))  #normalized ozone
-    ax2[0].plot(cdata['t'],x2, label=f[k], c=AirU_clr[axi-1])   #plot normalized data
+    ax2[0].plot(cdata['t'],x2, label=f[k])   #plot normalized data
     xcor = ax2[axi].xcorr( x2, x1, maxlags = 2000, alpha=.5, color=[.3,.3,.3])#cross correlation
     lag[axi]=xcor[0][np.argmax(xcor[1])] #how much time shift is needed for best correlation
-    ax2[n].plot(cdata['t']-lag[axi]*min_dt,x2, label=f[k], c=AirU_clr[axi-1]) #plot with corrected time
+    ax2[n].plot(cdata['t']-lag[axi]*min_dt,x2, label=f[k]) #plot with corrected time
     axi+=1
 
 ax2[n].plot(cdata['t']-lag[0]*min_dt,x1, 'k', label=f[standID])   #plot normalized data
@@ -236,7 +240,7 @@ def linfitfun(x,m,b,c):   #function to fit to, x must be first
 def nonlinfitfun(x,c1,c2,c3):   #function to fit to, x must be first
     return c1*(x+c3)/(c2+x)  #langmuir isotherm
 fig2.set_size_inches(12, 9)
-fig2.savefig(path+'z_TimeSeriesXCorr.png')
+fig2.savefig(path+'TimeSeries.png')
 
 CL = .95 #confidence level
 fig3, ax3 = plt.subplots(2,2)  #open a new figure in which we will plot
@@ -246,12 +250,12 @@ OtherData = pd.DataFrame(columns = ["MeanT", "StdT", "MeanH", "StdH", "MeanCO", 
 axi=1
 ax3[0][0].plot(cdata['t'],cdata['O3']/cdata['O3'].max(), label=f[standID], alpha=.7, c='k') 
 for k in AirU_fids:
-    ln, = ax3[0][0].plot(cdata['t'],cdata['O3-'+str(k)]/cdata['O3-'+str(k)].max(), label=f[k], alpha=.7,c=AirU_clr[axi-1]) 
+    ln, = ax3[0][0].plot(cdata['t'],cdata['O3-'+str(k)]/cdata['O3-'+str(k)].max(), label=f[k], alpha=.7) 
     ind = cdata['O3']>0
     x = cdata['O3-' + str(k)][ind]
     xfit = np.linspace(x.min(),x.max(),1000)
     y = cdata['O3'][ind]
-    ax_list[axi].plot(x, y, '.', alpha=.2, label=f[k],c=AirU_clr[axi-1]) 
+    ax_list[axi].plot(x, y, 'k.', alpha=.2, label=f[k]) 
     ax_list[axi].set_xlabel('Sensor R (KΩ)')
     ax_list[axi].set_ylabel('O3 (ppb)')
     ax_list[axi].grid('on')
@@ -272,7 +276,7 @@ for k in AirU_fids:
         j += 1
       #order from low to high
     yfit=nonlinfitfun(xfit,c_fit[0],c_fit[1],c_fit[2])
-    ax_list[axi].plot(xfit, yfit, 'k', alpha=.7, label = "Langmuir Fit") 
+    ax_list[axi].plot(xfit, yfit, 'r', alpha=.7, label = "Langmuir Fit") 
     ax_list[axi].legend()
     fit_df.loc[k,["c1","c2","c3"]] = c_fit
     fit_df.loc[k,["ci1","ci2","ci3"]] = ci
@@ -290,9 +294,9 @@ OData=pd.concat([OData, fit_df], axis=1)    #add the fit data to the output
 OData=pd.concat([OData, OtherData], axis=1)#add the other data to the output
 OData.to_csv(path+'O3AnalysisOutput.csv')   #save to file
 fig3.set_size_inches(12, 9)
-fig3.savefig(path+'z_Fits.png')
+fig3.savefig(path+'Fits.png')
 
-if (1==1):  #takes a lot of time and so can turn off by making if false
+if (1==2):  #takes a lot of time and so can turn off by making if false
     cdata=cdata[['t']+O3col+Tcol+Hcol] #cdata=cdata[['t']+O3col+Tcol+Hcol+COcol]  get rid of what we don't want
     sax=pd.plotting.scatter_matrix(cdata, alpha=0.1, diagonal='kde', figsize =(12,12), s=5)  #make fancy scatter plot
     corr = cdata.corr().as_matrix()  #get correlation coeff
@@ -302,4 +306,4 @@ if (1==1):  #takes a lot of time and so can turn off by making if false
         sax[i, j].set_facecolor(cm.RdBu(c/2+.25))
         sax[j, i].set_facecolor(cm.RdBu(c/2+.25))
     plt.suptitle('Scatter Matrix')
-    plt.savefig(path+'z_ScatterMatrix.png')
+    plt.savefig(path+'ScatterMatrix.png')
