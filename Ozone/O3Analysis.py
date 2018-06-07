@@ -18,6 +18,7 @@ from matplotlib import cm
 #path string to Data
 path = "D:\\Google Drive\\AirU Folder\\scripts\\Examples\\Ozone Example\\run_5_23\\"
 #path = "D:\\Google Drive\\AirU Folder\\scripts\\Examples\\Ozone Example\\"
+#path = "D:\\Google Drive\\AirU Folder\\scripts\\AirU (github)\\AirU\\Ozone\\O3Scoping\\O3_2018-06-06-15-10_C\\"
 
 def ADC2R(ADC,Rpot=0):  #function to convert from ADC to Resistance
     return 2047*(820+Rpot)/ADC-(820+Rpot)
@@ -203,8 +204,9 @@ ax2[n].legend()
 
 old_max_i = cdata['t'].shape[0]         #old length of data vectors
 maxlag=np.max(lag)                      #max lag
-newindex=[lag, old_max_i-maxlag+lag]    #new start and stop index for each dataset
-new_max_i=int(old_max_i-maxlag)         #new length of data vectors
+minlag=np.min(lag)
+newindex=[lag-minlag, old_max_i-maxlag+lag]    #new start and stop index for each dataset
+new_max_i=int(old_max_i-maxlag+minlag)         #new length of data vectors
 cdata['t']=cdata['t'][0:new_max_i]      #new time vector
 
 for k in range(0,n):
