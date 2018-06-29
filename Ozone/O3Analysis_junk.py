@@ -23,7 +23,7 @@ def hhmmss2min(hhmmss): #covert 'hh:mm:ss' string to minutes
     return int(s[0])*60+int(s[1])+int(s[2])/60  #convert to min
 
 #path string to Data
-path = "C:\\Users\\jbuss\\Desktop\\AQ&U\\Ozone\\run_5_30\\"
+path = "C:\\Users\\washi\\Google Drive\\AirU Folder\\scripts\\AirU (github)\\AirU\\Ozone\\O3Scoping\\O3_2018-06-13-11-00_C\\"
 #path = "D:\\Google Drive\\AirU Folder\\scripts\\Examples\\Ozone Example\\"
 
 f_all = os.listdir(path)  #read the directory

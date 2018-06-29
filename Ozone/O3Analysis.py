@@ -147,6 +147,7 @@ for fname in f:  #loop throug all the files
         ExpData['B2-StdQ'] = data[fid]['Flow Rate'].std()           #Flowrate
         ExpData['B2-MeanPDV'] = data[fid]['PDV'].mean()           #Voltage for lamp
         ExpData['B2-StdPDV'] = data[fid]['PDV'].std()           #Voltage for lamp
+        
     
     data[fid].loc[data[fid]['Temp']<-10,'Temp']=data[fid]['Temp'].median() #fix temperatures
     mode_dt=sp.stats.mode(np.diff(data[fid]['t']))[0][0] #most frequent dt
@@ -242,21 +243,72 @@ fig2.savefig(path+'z_TimeSeriesXCorr.png')
 
 CL = .95 #confidence level
 fig3, ax3 = plt.subplots(2,2)  #open a new figure in which we will plot
+#fig4, ax4 =  plt.subplots(len(data)-1)
 ax_list=[item for sublist in ax3 for item in sublist] 
 fit_df = pd.DataFrame(columns = ["c1", "ci1", "c2", "ci2", "c3", "ci3", "R2"])
-OtherData = pd.DataFrame(columns = ["MeanT", "StdT", "MeanH", "StdH", "MeanCO", "StdCO"]+list(ExpData.keys()))
 axi=1
 ax3[0][0].plot(cdata['t'],cdata['O3']/cdata['O3'].max(), label=f[standID], alpha=.7, c='k') 
+hightimes = [0, 20, 70, 120, cdata['t'].max()] #the times when we should be away from local mins, peak times
+
+def getTheLocals(x,y,ht):#find the local min and given the times, x, resistances, y, and approx peak times, ht
+    localmin_t=[]  #time of local mins
+    localmin_R=[]  #value of resistance at local mins
+    localmax_t=[]   #time of local max
+    localmax_R=[]   #value of resistance at local max
+    localmini = [] #index of local mins
+    localmaxi = [] #index of local mins
+    for i in range(0,len(ht)-1):  #loop through peak times
+        rangei=(x>ht[i]) & (x<ht[i+1])   #find between-peak time range
+        localmini.append(np.argmin(y[rangei]))    #find index of local min
+        localmin_t.append( x[localmini[-1]] )    #find time 
+        localmin_R.append( y[localmini[-1]] )  #find resistance
+        if i>0:
+            rangei=(x>localmin_t[-2]) & (x<localmin_t[-1]) 
+            localmaxi.append(np.argmax(y[rangei]))    #find index of local min
+            localmax_t.append( x[localmaxi[-1]] )    #find time 
+            localmax_R.append( y[localmaxi[-1]] )  #find resistance
+    return localmin_t, localmin_R, localmax_t, localmax_R
+
+localmin_t, localmin_R, localmax_t, localmax_R = getTheLocals(cdata['t'],cdata['O3'],hightimes)
+ax3[0][0].plot(localmin_t,localmin_R/cdata['O3'].max(), 'k.', alpha=.7,ms=15) 
+ax3[0][0].plot(localmax_t,localmax_R/cdata['O3'].max(), 'w.', alpha=.7,ms=15,markeredgecolor='k') 
+for i in range(0,len(hightimes)-1):
+    ExpData['B2-lmn'+str(i+1)+'t'] = localmin_t[i]
+    ExpData['B2-lmn'+str(i+1)+'R'] = localmin_R[i]
+    if (i<len(hightimes)-2):
+        ExpData['B2-lmx'+str(i+1)+'t'] = localmax_t[i]
+        ExpData['B2-lmx'+str(i+1)+'R'] = localmax_R[i]
+
+
+
+OtherData = pd.DataFrame(columns = ["pdfpeak", "MeanT", "StdT", "MeanH", "StdH", "MeanCO", "StdCO",'lmn1t','lmn2t','lmn3t','lmn4t','lmn1R','lmn2R','lmn3R','lmn4R','lmx1t','lmx2t','lmx3t','lmx1R','lmx2R','lmx3R']+list(ExpData.keys()))
+
+
 for k in AirU_fids:
-    ln, = ax3[0][0].plot(cdata['t'],cdata['O3-'+str(k)]/cdata['O3-'+str(k)].max(), label=f[k], alpha=.7,c=AirU_clr[axi-1]) 
+    themax=cdata['O3-'+str(k)].max()
+    ln, = ax3[0][0].plot(cdata['t'],cdata['O3-'+str(k)]/themax, label=f[k], alpha=.7,c=AirU_clr[axi-1]) 
     ind = cdata['O3']>0
     x = cdata['O3-' + str(k)][ind]
     xfit = np.linspace(x.min(),x.max(),1000)
     y = cdata['O3'][ind]
+    
+    #find basline reading where O3 should be zero
+    kde=scipy.stats.gaussian_kde(x)  #fit pde
+    xkde=np.linspace(0,50,1000)
+    kdemax=xkde[np.argmax(kde(xkde))]  #find max in pde which should be around baseline
+    #find local mins between peaks
+    localmin_t, localmin_R, localmax_t, localmax_R = getTheLocals(cdata['t'],cdata['O3-'+str(k)],hightimes)
+    OtherData.loc[k,['lmn1t','lmn2t','lmn3t','lmn4t']] = localmin_t
+    OtherData.loc[k,['lmn1R','lmn2R','lmn3R','lmn4R']] = localmin_R
+    OtherData.loc[k,['lmx1t','lmx2t','lmx3t']] = localmax_t
+    OtherData.loc[k,['lmx1R','lmx2R','lmx3R']] = localmax_R
+    
     ax_list[axi].plot(x, y, '.', alpha=.2, label=f[k],c=AirU_clr[axi-1]) 
     ax_list[axi].set_xlabel('Sensor R (KΩ)')
     ax_list[axi].set_ylabel('O3 (ppb)')
     ax_list[axi].grid('on')
+    
+    #ax4[axi-1].plot(xkde,kde(xkde), c=AirU_clr[axi-1])
     
     c_fit,R2,ci = fit_w_ci(x,y,linfitfun,CL)
     
@@ -279,6 +331,7 @@ for k in AirU_fids:
     fit_df.loc[k,["c1","c2","c3"]] = c_fit
     fit_df.loc[k,["ci1","ci2","ci3"]] = ci
     fit_df.loc[k,'R2'] = R2
+    OtherData.loc[k,'pdfpeak'] = kdemax
     OtherData.loc[k,'MeanT']=cdata['T-' + str(k)].mean()
     OtherData.loc[k,'StdT']=cdata['T-' + str(k)].std()
     OtherData.loc[k,'MeanH']=cdata['H-' + str(k)].mean()
@@ -286,6 +339,12 @@ for k in AirU_fids:
     OtherData.loc[k,'MeanCO']=cdata['CO-' + str(k)].mean()
     OtherData.loc[k,'StdCO']=cdata['CO-' + str(k)].std()
     OtherData.loc[k,list(ExpData.keys()) ] = ExpData
+    
+    ax_list[axi].plot([kdemax, kdemax],[y.min(), y.max()],'k--' )
+    ax_list[0].plot([0, cdata['t'].max()],[kdemax/themax, kdemax/themax],'k--',c=AirU_clr[axi-1] )
+    ax_list[0].plot(localmin_t,localmin_R/themax,'.',c=AirU_clr[axi-1],ms=15,markeredgecolor='k')
+    ax_list[0].plot(localmax_t,localmax_R/themax,'.',c='w',ms=15,markeredgecolor=AirU_clr[axi-1])
+    
     axi += 1
 ax3[0][0].legend()
 OData=pd.concat([OData, fit_df], axis=1)    #add the fit data to the output
@@ -294,7 +353,7 @@ OData.to_csv(path+'O3AnalysisOutput.csv')   #save to file
 fig3.set_size_inches(12, 9)
 fig3.savefig(path+'z_Fits.png')
 
-if (1==1):  #takes a lot of time and so can turn off by making if false
+if (1==2):  #takes a lot of time and so can turn off by making if false
     cdata=cdata[['t']+O3col+Tcol+Hcol] #cdata=cdata[['t']+O3col+Tcol+Hcol+COcol]  get rid of what we don't want
     sax=pd.plotting.scatter_matrix(cdata, alpha=0.1, diagonal='kde', figsize =(12,12), s=5)  #make fancy scatter plot
     corr = cdata.corr().as_matrix()  #get correlation coeff
