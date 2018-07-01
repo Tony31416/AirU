@@ -349,11 +349,11 @@ for k in AirU_fids:
 ax3[0][0].legend()
 OData=pd.concat([OData, fit_df], axis=1)    #add the fit data to the output
 OData=pd.concat([OData, OtherData], axis=1)#add the other data to the output
-OData.to_csv(path+'O3AnalysisOutput.csv')   #save to file
+OData.to_csv(path+'O3AnalysisOutput_'+str(int(ExpData['StartTimestamp']))+'.csv')   #save to file
 fig3.set_size_inches(12, 9)
 fig3.savefig(path+'z_Fits.png')
 
-if (1==2):  #takes a lot of time and so can turn off by making if false
+if (1==1):  #takes a lot of time and so can turn off by making if false
     cdata=cdata[['t']+O3col+Tcol+Hcol] #cdata=cdata[['t']+O3col+Tcol+Hcol+COcol]  get rid of what we don't want
     sax=pd.plotting.scatter_matrix(cdata, alpha=0.1, diagonal='kde', figsize =(12,12), s=5)  #make fancy scatter plot
     corr = cdata.corr().as_matrix()  #get correlation coeff

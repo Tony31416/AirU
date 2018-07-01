@@ -349,7 +349,7 @@ for k in AirU_fids:
 ax3[0][0].legend()
 OData=pd.concat([OData, fit_df], axis=1)    #add the fit data to the output
 OData=pd.concat([OData, OtherData], axis=1)#add the other data to the output
-OData.to_csv(path+'O3AnalysisOutput.csv')   #save to file
+OData.to_csv(path+'O3AnalysisOutput_'+str(int(ExpData['StartTimestamp']))+'.csv')   #save to file
 fig3.set_size_inches(12, 9)
 fig3.savefig(path+'z_Fits.png')
 
